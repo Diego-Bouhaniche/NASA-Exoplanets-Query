@@ -59,6 +59,10 @@ in ascending order on the values in that column.
 -   [ ] User can click on the down symbol to sort the rows in the results panel
 in descending order on the values in the column. 
 
+## Image
+
+![alt text](img/nasa.PNG)
+
 ## Useful links and resources
 
 - [Big O Notation (Wikipedia)](https://en.wikipedia.org/wiki/Big_O_notation)
