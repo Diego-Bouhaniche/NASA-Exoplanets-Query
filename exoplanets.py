@@ -1,4 +1,5 @@
-from tkinter import BOTTOM, LEFT, TOP, Button, Entry, Label, LabelFrame, OptionMenu, Scrollbar, StringVar, Text, Tk, ttk, messagebox, messagebox, CENTER, NO
+from tkinter import LEFT, TOP, Button, Entry, Label, LabelFrame, Scrollbar, StringVar, Tk, ttk, messagebox, messagebox, CENTER, NO
+from ttkwidgets.autocomplete import AutocompleteCombobox
 import webbrowser
 import csv
 import json
@@ -38,8 +39,13 @@ def csv_to_json(csvFile, jsonFilePath):
         csvReader = csv.DictReader(csvf) 
 
         #convert each csv row into python dict
-        for row in csvReader: 
-            #add this python dict to json array
+        for row in csvReader:
+
+            # Remove "
+            for i in row:
+                row[i] = row[i].replace("\"", "")
+
+            # add this python dict to json array
             jsonArray.append(row)
   
     # convert python jsonArray to JSON String and write to file, create file if not exists
@@ -60,27 +66,39 @@ def load_data():
             # returns JSON object as a dictionary
             data_json = json.load(f)
             messagebox.showinfo(title='Data loaded', message=f"Data sucessfully loaded !\n Items found : {len(data_json)}")
+            
+            # Get uniques data for filter
+            get_unique_data()
+
+            # Display data table part
+            display_data()
+
+            # Display Search & Filter parts
+            display_search_and_filter()
+
+            # Update var
+            is_data_loaded = True
         except:
             messagebox.showwarning(title='Error', message="No data found ! Use 'Download/Update' button")
-
-        # Get uniques data for filter
-        get_unique_data()
-
-        # Display data table part
-        display_data()
-
-        # Display Search & Filter parts
-        display_search_and_filter()
-
-        # Update var
-        is_data_loaded = True
 
     else:
         messagebox.showwarning(title='Error', message="Data already loaded !")
 
+# Update, prevents gui bug (data table resize)
+def update_gui():
+    global data_table_treeview
+    global link_label
+
+    data_table_treeview.forget()
+    link_label.forget()
+
+    data_table_treeview.pack()
+    link_label.pack()
 
 # [GUI] Table w/ data
 def display_data():
+    update_gui()
+
     # heading & columns
     global headers
 
@@ -95,8 +113,9 @@ def display_data():
         data_table_treeview.column("#0",  width=0,  stretch=NO)
 
         data_table_treeview['columns'] = (headers[0], headers[1], headers[2], headers[3], headers[4])  
-        for i in range(len(headers)):
-            data_table_treeview.column(headers[i],  anchor=CENTER, width=263)
+        for i in range(len(headers) - 1):
+            data_table_treeview.column(headers[i],  anchor=CENTER, width=225)
+        data_table_treeview.column(headers[4],  anchor=CENTER, width=350)       # longer width for facility column
 
         data_table_treeview.heading(headers[0], anchor=CENTER, text="Planet Name")
         data_table_treeview.heading(headers[1], anchor=CENTER, text="Hostname")
@@ -174,7 +193,13 @@ def search_data_facility():
         result = list(filter(lambda x: user_input in x[headers[4]].lower(), data_json))
         update_table(result)
 
-def filter_data():    
+# Filtering
+def filter_data():
+    hostname_choice = dropdown_filter_hostname_variable.get()  
+    year_choice = dropdown_filter_year_variable.get()  
+    method_choice = dropdown_filter_method_variable.get()  
+    facility_choice = dropdown_filter_facility_variable.get()  
+
     if(len(hostname_choice) == 0 and len(year_choice) == 0 and len(method_choice) == 0 and len(facility_choice) == 0):
         messagebox.showwarning(title='Error', message="No filter selected !")
     else:
@@ -210,6 +235,7 @@ def update_table(result):
 
 # Clear function
 def clear():
+
     # clear search
     planet_input.set("")
     hostname_input.set("")
@@ -230,11 +256,14 @@ def clear():
     facility_choice = ""
 
     wrapper4.destroy()
-
     wrapper4 = LabelFrame(root, text="Filter")
 
     display_search_and_filter()
     reset_data_table()
+
+def reset_data_table():
+    clear_data_table()
+    display_data()
 
 # Clear data table
 def clear_data_table():
@@ -243,58 +272,42 @@ def clear_data_table():
     for i in data_table_treeview.get_children():
         data_table_treeview.delete(i)
 
-def reset_data_table():
-    clear_data_table()
-    display_data()
-
 def display_search_and_filter():
     
-    def get_hostname_variable(choice1):
-        global hostname_choice
-        choice1 = dropdown_filter_hostname_variable.get()
-        hostname_choice = choice1
-    def get_year_variable(choice2):
-        global year_choice
-        choice2 = dropdown_filter_year_variable.get()
-        year_choice = choice2
-    def get_method_variable(choice3):
-        global method_choice
-        choice3 = dropdown_filter_method_variable.get()
-        method_choice = choice3
-    def get_facility_variable(choice4):
-        global facility_choice
-        choice4 = dropdown_filter_facility_variable.get()
-        facility_choice = choice4    
+    treeview_scrollbar.place(x=1290, y=2, height=270)
+    global dropdown_filter_hostname_variable
+    global dropdown_filter_year_variable
+    global dropdown_filter_method_variable
+    global dropdown_filter_facility_variable
 
-    # [GUI] Filter
-    dropdown_filter_hostname_variable = StringVar(wrapper4)
-    dropdown_filter_hostname_variable.set('Hostname') # default value
-    dropdown_filter_hostname = OptionMenu(wrapper4, dropdown_filter_hostname_variable, *unique_hostnames, command=get_hostname_variable)
-    dropdown_filter_hostname.grid(row=1, column=3, padx=6, pady=2)
+    dropdown_filter_hostname_label = Label(wrapper4, text="Hostnames")
+    dropdown_filter_hostname_variable = AutocompleteCombobox(wrapper4, width=25, completevalues=unique_hostnames)
+    dropdown_filter_hostname_label.grid(row=1, column=1, padx=6, pady=2)
+    dropdown_filter_hostname_variable.grid(row=1, column=2, padx=6, pady=2)
 
-    dropdown_filter_year_variable = StringVar(wrapper4)
-    dropdown_filter_year_variable.set("Years") # default value
-    dropdown_filter_year = OptionMenu(wrapper4, dropdown_filter_year_variable, *unique_years, command=get_year_variable)
-    dropdown_filter_year.grid(row=2, column=3, padx=6, pady=2)
+    dropdown_filter_year_label = Label(wrapper4, text="Years")
+    dropdown_filter_year_variable = AutocompleteCombobox(wrapper4, width=25, completevalues=unique_years)
+    dropdown_filter_year_label.grid(row=2, column=1, padx=6, pady=2)
+    dropdown_filter_year_variable.grid(row=2, column=2, padx=6, pady=2)
 
-    dropdown_filter_method_variable = StringVar(wrapper4)
-    dropdown_filter_method_variable.set("Methods") # default value
-    dropdown_filter_method = OptionMenu(wrapper4, dropdown_filter_method_variable, *unique_methods, command=get_method_variable)
-    dropdown_filter_method.grid(row=3, column=3, padx=6, pady=2)
+    dropdown_filter_method_label = Label(wrapper4, text="Methods")
+    dropdown_filter_method_variable = AutocompleteCombobox(wrapper4, width=25, completevalues=unique_methods)
+    dropdown_filter_method_label.grid(row=3, column=1, padx=6, pady=2)
+    dropdown_filter_method_variable.grid(row=3, column=2, padx=6, pady=2)
 
-    dropdown_filter_facility_variable = StringVar(wrapper4)
-    dropdown_filter_facility_variable.set("Facilities") # default value
-    dropdown_filter_facility = OptionMenu(wrapper4, dropdown_filter_facility_variable, *unique_facilities, command=get_facility_variable)
-    dropdown_filter_facility.grid(row=4, column=3, padx=6, pady=2)  
+    dropdown_filter_facility_label = Label(wrapper4, text="Facilites")
+    dropdown_filter_facility_variable = AutocompleteCombobox(wrapper4, width=25, completevalues=unique_facilities)
+    dropdown_filter_facility_label.grid(row=4, column=1, padx=6, pady=2)
+    dropdown_filter_facility_variable.grid(row=4, column=2, padx=6, pady=2)
 
     btn_apply = Button(wrapper4, text="Apply", command=filter_data)
-    btn_apply.grid(row=5, column=3, padx=6, pady=2)  
+    btn_apply.grid(row=5, column=2, padx=6, pady=2)  
 
     wrapper2.pack(fill="x",     expand="no", padx=20, pady=5)
     wrapper6.pack(fill="none",  expand="no", padx=20, pady=5, side=TOP, anchor='w')
     wrapper3.pack(fill="x",     expand="no", padx=20, pady=5, side=LEFT) # Search
     wrapper4.pack(fill="x",     expand="no", padx=20, pady=5, side=LEFT) # Filter
-    wrapper5.pack(fill="none",  expand="no", padx=20, pady=5, side=LEFT) # Clear
+    wrapper7.pack(fill="none",  expand="no", padx=20, pady=5, side=LEFT) # Test
 
 def selectItem(e):
     global url_link
@@ -305,23 +318,19 @@ def selectItem(e):
     hostname_clicked = data_table_treeview.item(curItem)['values'][1]
     planet_clicked = data_table_treeview.item(curItem)['values'][0]
 
-    # Remove "
-    hostname_clicked = hostname_clicked.replace("\"", "")
-    planet_clicked = planet_clicked.replace("\"", "")
-
     # Generate link
-    if(col == "#2"):
-        url_link = f"https://exoplanetarchive.ipac.caltech.edu/overview/{hostname_clicked}"
-    elif(col == "#1"):
+    if(col == "#1"):
         url_link = f"https://exoplanetarchive.ipac.caltech.edu/overview/{hostname_clicked}#planet_{planet_clicked}_collapsible"
         url_link = url_link.replace(" ", "-")
+    else:
+        url_link = f"https://exoplanetarchive.ipac.caltech.edu/overview/{hostname_clicked}"
 
     link_text.set(url_link)
 
 def link_clicked(e):
     global url_link
-    
     webbrowser.open_new(url_link)
+
 
 # --- MAIN CODE --- #
 
@@ -361,11 +370,15 @@ method_input = StringVar()
 facility_input = StringVar()
 
 # Filters choices
+dropdown_filter_hostname_variable = ""
+dropdown_filter_year_variable = ""
+dropdown_filter_method_variable = ""
+dropdown_filter_facility_variable = ""
+
 hostname_choice = ""
 year_choice = ""
 method_choice = ""
 facility_choice= ""
-dropdown_filter_hostname_variable = StringVar()
 
 # Add Some Style
 style = ttk.Style()
@@ -376,8 +389,8 @@ wrapper1 = LabelFrame(root, text="Commands")
 wrapper2 = LabelFrame(root, text="Data")
 wrapper3 = LabelFrame(root, text="Search")
 wrapper4 = LabelFrame(root, text="Filter")
-wrapper5 = LabelFrame(root, text="Clear")
 wrapper6 = LabelFrame(root, text="Link")
+wrapper7 = LabelFrame(root, text="Test")
 
 wrapper1.pack(fill="x",     expand="no", padx=20, pady=2)
 
@@ -390,12 +403,14 @@ btn_load_data = Button(wrapper1, text="Load data", bg="white", fg="black", comma
 btn_load_data.grid(row=0, column=1, padx=10, pady=10)
 
 # [GUI] Button reset data
-btn_reset_data = Button(wrapper1, text="Reset data", bg="white", fg="black", command=reset_data_table)
+btn_reset_data = Button(wrapper1, text="Clear", bg="white", fg="black", command=clear)
 btn_reset_data.grid(row=0, column=3, padx=10, pady=10)
 
 # [GUI] Treeview (Data table)
-data_table_treeview = ttk.Treeview(wrapper2, selectmode="extended", height=13)
+data_table_treeview = ttk.Treeview(wrapper2, selectmode="extended", height=10)
 data_table_treeview.bind('<ButtonRelease-1>', selectItem)
+treeview_scrollbar = ttk.Scrollbar(wrapper2, orient="vertical", command=data_table_treeview.yview)
+data_table_treeview.configure(yscrollcommand=treeview_scrollbar.set)
 
 data_table_treeview.pack()
 
@@ -450,9 +465,6 @@ ent_search_facility = Entry(wrapper3, textvariable=facility_input)
 ent_search_facility.grid(row=4, column=1, padx=6, pady=2)
 btn_search_facility = Button(wrapper3, text="Search", command=search_data_facility)
 btn_search_facility.grid(row=4, column=2, padx=6, pady=2)
-
-btn_clear = Button(wrapper5, text="Clear", command=clear)
-btn_clear.grid(row=0, column=0, padx=6, pady=2)
 
 # [GUI] Link
 link_label = Label(wrapper6, textvariable=link_text, fg="blue", cursor="hand2")
